@@ -1,0 +1,40 @@
+# One-time helper: unpacks an uploaded project zip into this repository.
+# 1. Upload pocketleaf.zip to the top of the repository (Add file → Upload files).
+# 2. Actions → "Unpack project zip" → Run workflow.
+# 3. Then Actions → "Android APK" → Run workflow.
+name: Unpack project zip
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Unpack the zip into the repository
+        run: |
+          set -e
+          zip=$(ls *.zip 2>/dev/null | head -n 1)
+          if [ -z "$zip" ]; then
+            echo "No .zip at the top of the repository. Upload pocketleaf.zip first."
+            exit 1
+          fi
+          echo "Unpacking $zip"
+          rm -rf /tmp/unpack && mkdir /tmp/unpack
+          unzip -q "$zip" -d /tmp/unpack
+          src=$(dirname "$(find /tmp/unpack -name package.json -not -path '*/node_modules/*' | head -n 1)")
+          # GitHub does not let a workflow change workflow files, so those stay as they are.
+          rm -rf "$src/.github"
+          cp -a "$src"/. .
+          git rm -q "$zip"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Unpack the Pocketleaf project from $zip"
+          git push
+          echo "Done. Now run the Android APK workflow."
