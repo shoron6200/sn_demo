@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- sndemo mark: a paper plane leaving (a file sent). Blue #2f6fe0 on light. -->
+  <path d="M86 16 L14 44 L40 54 L52 84 L62 54 Z" fill="#2f6fe0"/>
+  <path d="M86 16 L40 54 L52 84 Z" fill="#245bc0"/>
+  <path d="M86 16 L40 54" stroke="#fbfdff" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+</svg>
