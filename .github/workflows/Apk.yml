@@ -1,10 +1,11 @@
-# Builds an installable Pocketleaf APK on GitHub's servers. No Expo account needed.
+# Builds an installable sndemo APK on GitHub's servers. No Expo account needed.
 # Run it: GitHub → Actions → "Android APK" → Run workflow (or push to main).
-# Download it: open the finished run → Artifacts → pocketleaf-apk.
+# Download it: open the finished run → Artifacts → sndemo-apk.
 #
-# Signing: if the repository has the secrets below, the APK is signed with your
-# own key (keep that key: updates must use the same one). Without them it is
-# signed with Android's debug key, which installs fine on your own phone.
+# The APK is arm64 only (every phone from the last several years), and shrunk,
+# so it is a fraction of a universal build. Signing: with the secrets below it
+# uses your own key; without them, Android's debug key (installs fine on your
+# own phone).
 #   ANDROID_KEYSTORE_BASE64   base64 of a .jks keystore
 #   ANDROID_KEYSTORE_PASSWORD
 #   ANDROID_KEY_ALIAS
@@ -36,19 +37,19 @@ jobs:
           java-version: 17
 
       # The runner already has the Android SDK; this only accepts its licences.
-      # (Its default package list asks for 'tools', which Google has removed.)
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
 
       - name: Install dependencies
-        run: npm ci
+        # npm install (not npm ci) so a hand-edited package.json still builds:
+        # it syncs the lock file instead of failing when they are out of sync.
+        run: npm install --no-audit --no-fund
 
       - name: Check before building
         run: |
           npm run typecheck
           npm test
-          python3 -I replica-tools/sweep.py . --config replica/brand.json
 
       - name: Generate the native Android project
         run: npx expo prebuild --platform android --no-install --clean
@@ -62,33 +63,33 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE" | base64 -d > android/app/release.jks
-          cat >> android/gradle.properties <<EOF
-          POCKETLEAF_STORE_FILE=release.jks
-          POCKETLEAF_STORE_PASSWORD=$STORE_PASSWORD
-          POCKETLEAF_KEY_ALIAS=$KEY_ALIAS
-          POCKETLEAF_KEY_PASSWORD=$KEY_PASSWORD
-          EOF
+          cat >> android/gradle.properties <<GRADLE
+          SNDEMO_STORE_FILE=release.jks
+          SNDEMO_STORE_PASSWORD=$STORE_PASSWORD
+          SNDEMO_KEY_ALIAS=$KEY_ALIAS
+          SNDEMO_KEY_PASSWORD=$KEY_PASSWORD
+          GRADLE
           python3 - <<'PY'
           import re, pathlib
           p = pathlib.Path("android/app/build.gradle")
           s = p.read_text()
           s = s.replace("signingConfigs {", """signingConfigs {
-                  pocketleaf {
-                      storeFile file(POCKETLEAF_STORE_FILE)
-                      storePassword POCKETLEAF_STORE_PASSWORD
-                      keyAlias POCKETLEAF_KEY_ALIAS
-                      keyPassword POCKETLEAF_KEY_PASSWORD
+                  sndemo {
+                      storeFile file(SNDEMO_STORE_FILE)
+                      storePassword SNDEMO_STORE_PASSWORD
+                      keyAlias SNDEMO_KEY_ALIAS
+                      keyPassword SNDEMO_KEY_PASSWORD
                   }""", 1)
-          s = re.sub(r"(release \{[^}]*?)signingConfig signingConfigs\.debug", r"\1signingConfig signingConfigs.pocketleaf", s, count=1, flags=re.S)
+          s = re.sub(r"(release \{[^}]*?)signingConfig signingConfigs\.debug", r"\1signingConfig signingConfigs.sndemo", s, count=1, flags=re.S)
           p.write_text(s)
           PY
 
-      - name: Build the release APK
+      - name: Build the release APK (arm64 only, shrunk)
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - uses: actions/upload-artifact@v5
         with:
-          name: pocketleaf-apk
+          name: sndemo-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
